@@ -1,0 +1,140 @@
+| vim: ft=reva :
+
+push~
+~util ~sys ~strings ~io
+needs util/classes
+needs db/sqlite
+~db
+~help
+0 value helpdb
+
+: defaulthelp 
+quote =
+Type 'help' followed by the word you want help on, to get help
+specific to that word.  For example:
+
+	help @
+
+Will display help about the word "@"
+
+You may also ask for help about certain topics:
+
+	classes libraries preprocessor stack-ops file-io console-io conditionals
+	flow-control program-control strings throw-codes
+= type cr ;
+
+
+create theword  200 allot
+: nohelp2 cr ." Sorry, I can't find help for the word: " theword count type cr ;
+variable found
+variable also
+: getalso 
+	also @ 0if ." SEE ALSO: " also on then
+	0 sql_getcol$ type_ false ;
+variable lib#
+: dolibs
+	lib# off
+	quote !
+The set of words built-in to Reva is impressive considering the small size of
+the program.  However, Reva also provides additional words covering a variety of
+fields, ready for use. These extra 'libraries' are in the 'lib' subdirectory,
+and are currently:
+	! type cr 5 spaces
+	helpdb " select name from libs order by name" 
+		{ 0 sql_getcol$ 4 /string 
+		dup 1+ lib# +! type_ 
+		lib# @ 70 min 60 >if lib# off cr 5 spaces then
+		false } sql_fetch drop
+	cr cr 
+	." Use \"needs\" to use them" cr
+	;
+: (gethelp) 
+	found on
+	theword count type_
+	0 sql_getcol$ dup 0if 2drop else
+	'( emit space type_ ') emit space
+	then
+	| orig:
+	| get other information about the word
+	
+	3 sql_getcol$ find
+	?dup if
+		| ctx
+		theword count rot in~ ~sys find-word
+		| 0 | a n dict -1
+		if classof type then
+	then
+
+	cr
+	." Context: " 3 sql_getcol$ type cr
+	." Source in: " 4 sql_getcol$ type cr
+	5 sql_getcol$ dup 0if 2drop else type space ." ONLY" cr then
+	6 sql_getcol$ dup 0if 2drop else ." Version: " type cr then
+	1 sql_getcol$ type cr
+	also off
+	" select word from help where ix in (select other from also where ix=" pad place
+		2 sql_getcol$ pad +place
+		" ) order by word" pad +place
+	helpdb pad count ['] getalso sql_fetch
+	cr false
+	;
+: gethelp ( a n -- )
+	2dup " libraries" cmpi 0if 2drop dolibs ;then
+	found off
+	dup 0if 2drop defaulthelp ;then
+
+	2dup theword place
+	|          0    1    2  3   4   5  6
+	" select stack,desc,ix,ctx,orig,os,ver from help where word='" pad place
+	quote' pad +place
+	" '" pad +place
+	helpdb pad count ['] (gethelp) sql_fetch
+	found @ 0if nohelp2 then
+	drop
+	;
+
+: (grephelp) 0 sql_getcol$ type space false ;
+
+create grepbuf 256 allot
+: grephelp ( a n -- )
+	" '%" grepbuf place
+	quote' grepbuf +place
+	" %'" grepbuf +place
+
+	" select word from help where word like " pad place
+		grepbuf count pad +place
+
+	"  or desc like " pad +place
+		grepbuf count pad +place
+	helpdb pad count ['] (grephelp) sql_fetch drop
+	;
+: showhelp2 ;
+:: parsews gethelp ; is help
+:: parsews grephelp ; is help/
+: starthelp
+	appdir pad place " help.db" pad +place  
+	pad count sql_open to helpdb
+
+	['] nohelp 0if
+	." starthelp" cr
+		['] nohelp2 is nohelp
+		['] showhelp2 is showhelp
+	then
+	;
+starthelp
+
+pop~
+|||
+def: starthelp
+ctx: ~help
+stack: --
+desc: -
+	Initialize the help system.
+-
+def: gethelp
+ctx: ~help
+stack: a n -- 
+desc: -
+	This is the word actually called by "help".  It knows how to query the help
+	database for the word (a,n).
+-

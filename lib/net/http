@@ -1,0 +1,27 @@
+| http helper library
+| vim: ft=reva :
+
+push~
+needs net/sockets
+
+64000 constant maxpagesize
+| ronware.org:blah.html
+: getpage ( a n -- a n )
+	': split not if
+		| just host
+		" /" 2swap
+	then
+	80 connectsocket dup -1 =if 3drop " CONNECT FAILURE" ;then
+	| a n s
+	>r		| a n (r:s)
+	" GET " pad place
+	pad +place
+	crlf pad +place
+	| (r:s) pad-> "GET page.html"
+	r@ pad count 0 send			| made request for page
+	r@ maxpagesize allocate dup >r maxpagesize 0 recv
+	| n -- number of bytes retreived
+	r> over resize | n a
+	swap r> closesocket
+	;
+pop~

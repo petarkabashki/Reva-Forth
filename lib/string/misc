@@ -1,0 +1,173 @@
+| vim: ft=reva :
+| various string utilities
+
+push~
+~strings
+: uc $df and ; | uppercase a character
+: strlwr ( a n -- a n )
+	2dup 0 do dup i + dup c@ lc swap c! loop drop ;
+: ws? 0 32 between ;
+: s++ 1 /string ;
+: strnew: ( <name> -- )
+	create 0 , 252 allot
+	does>
+	;
+: zcat ( src dest --) | append string src to dest (both \0 terminated strings
+	| assumes dest has enough room!
+    zcount + >r
+    zcount 1+
+    r>
+    swap move ;
+: strcatf ( a1 n1 a2 n2 -- a3 n3 )
+	2swap scratch lplace
+	scratch +lplace
+	scratch lcount
+	;
+: strcat  ( a1 n1 a2 n2 -- a3 n3 )
+	| append (a2,n2) to (a1,n1) returning an "allocate"d (a3,n3)
+	| NOTE: the user must "free" a3 to be well-behaved.
+	>r over r@ + 1+ | a1 n1 a2 n3 (r:n2)
+	dup allocate swap | a1 n1 a2 a3 n3 ( r:n2 )
+	>r 2swap dup >r 	| a2 a3 a1 n1 (r:n1 n3 n2)
+	2 pick swap move | a2 a3 (r:n3 n2)
+	swap over r> + r> r> swap >r | a3 a2 a3 n2 (r:n3)
+	move r> | a3 n3
+	2dup + 1- 0 swap c! 1-
+	;
+: search2 ( a1 n1 a2 n2 -- a3 n3 -1 | a1 n1 a2 n2 0 )
+	4dup search 00;
+	>r 2nip 2nip r>
+	;
+
+| contributed by Bob Armstrong:
+: splitws  ( a n -- a1 n1 a2 n2 true | a n false )    
+	dup 0if false ;then 
+	2dup 0do    | a n a n a    
+	count ws? if leave then loop  
+	dup >r 2 pick - 2dup -
+	dup 0if 2drop 2dup + 1- c@ ws? if 1- then  r> drop false ;then
+	>r 1- nip r> r> swap true ;
+
+| remove all instances of 'c' from string:
+: -char ( a n c -- a n' ) | thanks to Helmar
+	-rot over >r bounds tuck ?do
+		2dup i c@ rot of drop else swap c! 1+ then
+	loop nip r@ - r> swap ;
+
+| allocate a new string containing the original contents:
+: strdup ( a n -- a' n' )
+	dup 1+ allocate 0; >r
+	r@ swap dup >r 1+ move
+	r> r> swap
+	;
+
+pop~
+
+|||  
+def: strnew:
+stack: <name> --
+ctx: ~strings
+ver: 6.1
+desc: =
+	Allocate a named buffer capable of holding either a small counted string or
+	a NUL terminated string smaller than 255 bytes.
+=
+
+def: zcat
+stack: src dest --
+ctx: ~strings
+ver: 6.1
+desc: =
+	Append NUL terminated string at "src" to "dest".  It is up to the programmer
+	to ensure that "dest" has enough space to accommodate all the string data.
+=
+def: strcatf
+stack: a1 n1 a2 n2 -- a3 n3
+ctx: ~strings
+ver: 6.1
+desc: =
+	Append (a2,n2) to (a1,n1) resulting in the string (a3,n3).  The string
+	(a3,n3) is always in the "scratch" buffer, and so using this more than once
+	will overwrite previous strings (or anything else in "scratch").  It is,
+	however, much faster than "strcat".  On the other hand, one may not use
+	strings larger than 4091 bytes total.
+=
+def: strcat
+stack: a1 n1 a2 n2 -- a3 n3
+ctx: ~strings
+ver: 6.1
+desc: =
+	Append (a2,n2) to (a1,n1) resulting in the string (a3,n3).  The memory at
+	"a3" is "allocate"d, so a properly behaving application will take care to
+	"free" it.  The resultant string may be as large as memory permits.
+=
+
+
+def: uc
+stack: c -- c
+ctx: ~strings
+desc: =
+	Convert the character to uppercase
+=
+
+def: strlwr
+stack: a n --  a n
+ctx: ~strings
+desc: =
+	Convert string to lowercase
+=
+
+def: ws?
+stack: c -- flag
+ctx: ~strings
+desc: =
+	Return "true" if the character is "whitespace"
+=
+
+def: s++
+stack: a n -- a' n'
+ctx: ~strings
+desc: =
+	Increment the string by one character
+=
+
+def: string/misc 
+ctx: ~
+desc: =
+	Various and sundry string routines:
+	=
+def: search2
+ctx: ~strings
+stack: a1 n1 a2 n2 -- a3 n3 -1 | a1 n1 a2 n2 0 
+desc: =
+	Same as "search", but on failure returns the original arguments as well.
+=
+
+def: splitws
+stack:  a n -- a1 n1 a2 n2 true | a n false
+ctx: ~strings
+ver: 6.1.5
+desc: =
+    Split string on first occurrence of whitespace. Returns empty strings for initial, trailing,
+        or consecutive whitespace. If no whitespace in string, returns unchanged with flag false.
+=
+def: -char 
+stack: a n c -- a n
+ctx: ~strings
+ver: 6.1.9
+desc: =
+	Remove all instances of character 'c' from the string (a,n)
+=
+
+| allocate a new string containing the original contents:
+def: strdup 
+stack: a n -- a' n'
+ctx: ~strings
+ver: 6.1.9
+desc: =
+	Create a duplicate of the passed-in string, in allocated memory.  The caller
+	has the rsponsibility of freeing the memory used by the duplicate.
+=
+
+
+related: ~strings string/misc s++ ws? strlwr strcat strcatf scratch zcat strnew search search2 splitws -char strdup
